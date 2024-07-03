@@ -1,0 +1,370 @@
+"use strict";
+class RdataTB {
+    constructor(
+        e,
+        t = {
+            RenderJSON: null,
+            ShowSearch: !0,
+            ShowSelect: !0,
+            ShowPaginate: !0,
+            SelectionNumber: [5, 10, 20, 50, -1], // Modified: Added -1 for "Show All"
+            HideColumn: [],
+            ShowHighlight: !1,
+            fixedTable: !1,
+            sortAnimate: !0,
+            ShowTfoot: !0,
+            ExcludeColumnExport: [],
+        }
+    ) {
+        var a, l, i, s;
+        (this.HeaderDataTable = []),
+        (this.RowDataTable = []),
+        (this.DataTable = []),
+        (this.DataSorted = []),
+        (this.DataToRender = []),
+        (this.PageSize = t.PageSize || 5),
+        (this.Assc = !1),
+        (this.DataSearch = []),
+        (this.i = 0),
+        (this.COntrolDataArr = []),
+        (this.DataTableRaw = []),
+        (this.searchValue = ""),
+        (this.ListHiding = []),
+        (this.SelectionNumber = [5, 10, 20, 50, -1]), // Modified: Added -1 for "Show All"
+        (this.SelectElementString = ""),
+        (this.ShowHighlight = !1),
+        (this.listTypeDate = []),
+        (this.PageNow = 1),
+        (this.ExcludeColumnExport = []),
+        (this.TableElement = document.getElementById(e)),
+        (this.Options = t),
+        this.detectTyped(),
+            this.StyleS(),
+            this.ConvertToJson(),
+            this.paginateRender(),
+            this.Control(),
+            this.search(),
+            this.RenderToHTML(),
+            this.PaginateUpdate(),
+            null != t.RenderJSON && t.hasOwnProperty("RenderJSON") && this.JSONinit(t.RenderJSON),
+            !t.ShowSelect && t.hasOwnProperty("ShowSelect") && (null === (a = document.getElementById("my-select")) || void 0 === a || a.remove()),
+            (this.ShowHighlight = null == t ? void 0 : t.ShowHighlight),
+            t.fixedTable && t.hasOwnProperty("fixedTable") ? null === (l = this.TableElement) || void 0 === l || l.classList.add("table_layout_fixed") : null === (i = this.TableElement) || void 0 === i || i.classList.remove("table_layout_fixed"),
+            !t.ShowSearch && t.hasOwnProperty("ShowSearch") && (null === (s = document.getElementById("SearchControl")) || void 0 === s || s.remove()),
+            null != t.HideColumn && t.hasOwnProperty("HideColumn") && ((this.ListHiding = t.HideColumn), this.DoHide()),
+            null != t.SelectionNumber && t.hasOwnProperty("SelectionNumber") && ((this.SelectionNumber = t.SelectionNumber), this.ChangeSelect()),
+            (this.totalPages = this.Divide().length);
+    }
+    detectTyped() {
+        var e;
+        let t = null === (e = this.TableElement) || void 0 === e ? void 0 : e.getElementsByTagName("th");
+        for (let a = 0; a < t.length; a++) t[a].attributes["type-date"] && this.listTypeDate.push({
+            HeaderIndex: a,
+            dateVal: !0
+        });
+    }
+    StyleS() {
+        let e = document.createElement("style");
+        (e.innerHTML = `
+        .table_layout_fixed { 
+            table-layout:fixed;
+        }
+        table > thead{
+            -webkit-user-select: none;  
+            -moz-user-select: none;    
+            -ms-user-select: none;      
+            user-select: none;
+        }
+        .pagination a {
+          color: black;
+          float: left;
+          padding: 8px 12px;
+          text-decoration: none;
+          transition: background-color .3s;
+          border-radius:.75em;
+        }
+        .tablesorter-header-asc::after {
+            content: '\\2191';
+            top: calc(50% - 0.75em);
+            float: right;
+        }
+        .tablesorter-header-desc::after {
+            content: '\\2193';
+            top: calc(50% - 0.75em);
+            float: right;
+        }
+        .pagination a:hover:not(.active) {
+          background-color: #054972;
+          color: white;
+        }
+        .blink_me {
+            animation: blinker 1s;
+          }
+          @keyframes blinker {
+            50% {
+              opacity: .5;
+            }
+          } 
+          `),
+        document.getElementsByTagName("head")[0].appendChild(e);
+    }
+    ChangeSelect() {
+        this.SelectElementString = "";
+        for (let e = 0; e < this.SelectionNumber.length; e++) {
+            let value = this.SelectionNumber[e];
+            let text = value === -1 ? "All" : value;
+            this.SelectElementString += `<option value="${value}">${text}</option>`;
+        }
+        let t = document.getElementById("my-select");
+        if (t) {
+            t.innerHTML = this.SelectElementString;
+        }
+        return this.SelectElementString;
+    }
+
+    Control() {
+        let e = document.createElement("span");
+        (e.innerHTML = `
+        <table id="C" border="0" style="width:100%;margin-bottom:12px;">
+        <tr>
+          <td style="width:100%;">
+             <select id="my-select" class="form-select shadow-none" style="float:left;width:99px!important;margin-right:10px;">
+             ${this.ChangeSelect()}
+             </select>
+             <input id="SearchControl" class="form-control shadow-none" placeholder="Search" type="text" style="width:30%;margin-left:10px">
+          </td>
+        </tr>
+      </table>
+        `),
+        (e.className = "Selc"),
+        this.TableElement.parentNode.insertBefore(e, this.TableElement),
+            (this.TableElement.style.width = "100%");
+        let t = (e) => {
+                // Modified: Handle "Show All" option
+                this.PageSize = parseInt(e) === -1 ? this.DataTable.length : parseInt(e);
+                (this.i = 0), this.RenderToHTML();
+            },
+            a = document.getElementById("my-select");
+        null == a ||
+            a.addEventListener("change", function() {
+                t(this.value);
+            }),
+            (document.getElementById("x__NEXT__X").onclick = () => {
+                this.nextItem(), this.highlight(this.searchValue), this.DoHide();
+            }),
+            (document.getElementById("x__PREV__X").onclick = () => {
+                this.prevItem(), this.highlight(this.searchValue), this.DoHide();
+            });
+    }
+    nextItem() {
+        (this.i = this.i + 1), (this.i = this.i % this.Divide().length), (this.COntrolDataArr = this.Divide()[this.i]), this.RenderToHTML(this.COntrolDataArr), (this.PageNow = this.i + 1);
+    }
+    prevItem() {
+        0 === this.i && (this.i = this.Divide().length), (this.i = this.i - 1), (this.PageNow = this.i + 1), (this.COntrolDataArr = this.Divide()[this.i]), this.RenderToHTML(this.COntrolDataArr);
+    }
+    paginateRender() {
+        let e = document.createElement("span");
+        (e.innerHTML = ' <div class="pagination" id="pgN"><a class="me-1" id="x__PREV__X" style="cursor:pointer;user-select: none;"><svg xmlns="http://www.w3.org/2000/svg" class="mb-1" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a><div id="PF" class="me-1"></div><a id="x__NEXT__X" style="cursor:pointer;user-select: none;"><svg xmlns="http://www.w3.org/2000/svg"class="mb-1" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></a></div>'), (e.className = "asterisk"), this.TableElement.parentNode.insertBefore(e, this.TableElement.nextSibling);
+    }
+    PaginateUpdate() {
+        null != document.getElementById("PF") &&
+            (document.getElementById("PF").innerHTML = `
+            <a style="">Page ${this.i + 1} to ${this.Divide().length} of ${void 0 === this.DataTable ? 0 : this.DataTable.length} Entries</a>`);
+    }
+    search() {
+        var e;
+        (this.DataSearch = this.DataTable),
+        null === (e = document.getElementById("SearchControl")) ||
+            void 0 === e ||
+            e.addEventListener("input", (e) => {
+                (this.searchValue = e.target.value),
+                (this.DataTable = this.DataSearch.filter((t) => {
+                    for (let a = 0; a < this.HeaderDataTable.length; a++) {
+                        let l = t[this.HeaderDataTable[a]].toString().toLowerCase().includes(e.target.value.toLowerCase());
+                        if (l) return l;
+                    }
+                })),
+                this.RenderToHTML(),
+                    (this.i = 0),
+                    this.PaginateUpdate(),
+                    this.highlight(e.target.value);
+            });
+    }
+    ConvertToJson() {
+        var e, t, a;
+        let l = null === (e = this.TableElement) || void 0 === e ? void 0 : e.getElementsByTagName("th");
+        for (let i = 0; i < l.length; i++) null === (t = this.HeaderDataTable) || void 0 === t || t.push(l[i].textContent);
+        let s = null === (a = this.TableElement) || void 0 === a ? void 0 : a.getElementsByTagName("tbody");
+        for (let r = 0; r < (void 0 === s[0] ? 0 : s[0].rows.length); r++) {
+            let n = [];
+            for (let h = 0; h < s[0].rows[r].cells.length; h++) n.push(s[0].rows[r].cells[h].innerHTML);
+            this.RowDataTable.push(n);
+        }
+        return (this.DataTable = this.RowDataTable.reduce((e, t) => (e.push(this.HeaderDataTable.reduce((e, a, l) => ((e[a] = t[l]), e), {})), e), [])), (this.DataTableRaw = this.DataTable), this.DataTable;
+    }
+    Divide() {
+        let e = [],
+            t = "string" == typeof this.PageSize ? parseInt(this.PageSize) : this.PageSize;
+        for (let a = 0; a < (void 0 === this.DataTable ? 0 : this.DataTable.length); a += t) e.push(this.DataTable.slice(a, a + t));
+        return e;
+    }
+    RenderToHTML(e = null) {
+        this.TableElement.innerHTML = "";
+        let t = (null === this.DataSorted || this.DataSorted === [] || this.DataSorted, this.Divide()[0]);
+        this.DataToRender = t;
+        let a = "",
+            l = "";
+        for (let i = 0; i < this.HeaderDataTable.length; i++)
+            (a += `<th style="cursor: pointer;" id="${this.HeaderDataTable[i]}_header" class="columns tablesorter-header">${this.HeaderDataTable[i]}</th>
+`),
+            (l += `<th style="cursor: pointer;" id="${this.HeaderDataTable[i]}_footer" class="columns tablesorter-header">${this.HeaderDataTable[i]}</th>
+`);
+        let s = void 0 === this.DataToRender ? 0 : this.DataToRender.length,
+            r = "";
+        if (null === e)
+            for (let n = 0; n < s; n++) {
+                let h = "";
+                for (let o = 0; o < this.HeaderDataTable.length; o++)
+                    h += `<td class="${this.HeaderDataTable[o]}__row">${this.DataToRender[n][this.HeaderDataTable[o]]}</td>
+`;
+                r += `<tr>${h}</tr>
+`;
+            }
+        else {
+            for (let d = 0; d < e.length; d++) {
+                let c = "";
+                for (let g = 0; g < this.HeaderDataTable.length; g++)
+                    c += `<td class="${this.HeaderDataTable[g]}__row">${e[d][this.HeaderDataTable[g]]}</td>
+`;
+                r += `<tr>${c}</tr>
+`;
+            }
+            this.DataToRender = e;
+        }
+        let $ = `<thead><tr>${a}</tr></thead><tbody>${r}</tbody>`;
+        this.Options.ShowTfoot && ($ += `<tfoot>${l}</tfoot>`), (this.TableElement.innerHTML = $);
+        for (let u = 0; u < this.HeaderDataTable.length; u++) {
+            let T = document.getElementById(`${this.HeaderDataTable[u]}_header`);
+            (document.getElementById(`${this.HeaderDataTable[u]}_header`).style.opacity = "100%"),
+            (T.onclick = () => {
+                this.sort(this.HeaderDataTable[u]);
+                let e = document.getElementById(`${this.HeaderDataTable[u]}_header`);
+                if (((document.getElementById(`${this.HeaderDataTable[u]}_header`).style.opacity = "60%"), this.Assc ? (e.classList.remove("tablesorter-header-asc"), e.classList.add("tablesorter-header-desc")) : (e.classList.remove("tablesorter-header-desc"), e.classList.add("tablesorter-header-asc")), this.Options.sortAnimate)) {
+                    let t = document.getElementsByClassName(`${this.HeaderDataTable[u]}__row`);
+                    for (let a = 0; a < t.length; a++) setTimeout(() => t[a].classList.add("blink_me"), 21 * a);
+                }
+            });
+        }
+        this.PaginateUpdate(), this.DoHide();
+    }
+    sort(e) {
+        let t = performance.now();
+
+        function a(e, t) {
+            let a = [],
+                l = [];
+            e
+                .toString()
+                .replace(/(^\$|,)/g, "")
+                .replace(/(\d+)|(\D+)/g, function(e, t, l) {
+                    a.push([t || 1 / 0, l || ""]);
+                }),
+                t
+                .toString()
+                .replace(/(^\$|,)/g, "")
+                .replace(/(\d+)|(\D+)/g, function(e, t, a) {
+                    l.push([t || 1 / 0, a || ""]);
+                });
+            for (let i = 0; a.length && l.length; i++) {
+                let s = a.shift(),
+                    r = l.shift(),
+                    n = s[0] - r[0] || s[1].localeCompare(r[1]);
+                if (n) return n;
+            }
+            return a.length - l.length;
+        }
+        let l = this.HeaderDataTable.indexOf(e),
+            i = this.listTypeDate.find((e) => e.HeaderIndex === l),
+            s = (null == i ? void 0 : i.HeaderIndex) === l,
+            r = this.DataTable;
+        this.Assc ? ((this.Assc = !this.Assc), s ? r.sort((t, a) => Date.parse(t[e]) - Date.parse(a[e])) : r.sort((t, l) => a(t[e], l[e]))) : ((this.Assc = !this.Assc), s ? r.sort((t, a) => Date.parse(a[e]) - Date.parse(t[e])) : r.sort((t, l) => a(l[e], t[e]))), (this.DataSorted = r), (this.i = 0), this.RenderToHTML();
+        let n = performance.now();
+        return (this.timeSort = Math.round(((n - t) / 1e3) * 1e4) / 1e4), this.DataSorted;
+    }
+    MExcludeColumnExport() {
+        let e = JSON.parse(JSON.stringify(this.DataTable)),
+            t = this.Options.ExcludeColumnExport,
+            a = [...this.HeaderDataTable];
+        for (let l = 0; l < t.length; l++) {
+            let i = a.indexOf(t[l]);
+            i > -1 && a.splice(i, 1);
+        }
+        for (let s = 0; s < e.length; s++)
+            for (let r = 0; r < t.length; r++) delete e[s][t[r]];
+        return {
+            header: a,
+            data: e
+        };
+    }
+    DownloadCSV(e = "Export") {
+        let t = this.MExcludeColumnExport(),
+            a = "";
+        a = t.header.toString() + "\r\n";
+        for (let l = 0; l < t.data.length; l++) {
+            let i = "";
+            for (let s in t.data[l]) "" != i && (i += ","), (i += t.data[l][s]);
+            a += i + "\r\n";
+        }
+        let r = document.createElement("a");
+        (r.href = "data:text/csv;charset=utf-8," + encodeURIComponent(a)), (r.target = "_blank"), (r.download = e + ".csv"), r.click();
+    }
+    DownloadJSON(e = "Export") {
+        let t = this.MExcludeColumnExport(),
+            a = document.createElement("a");
+        (a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(t.data))), (a.target = "_blank"), (a.download = e + ".json"), a.click();
+    }
+    highlight(e) {
+        var t;
+        if (this.ShowHighlight) {
+            let a = null === (t = this.TableElement) || void 0 === t ? void 0 : t.getElementsByTagName("tbody");
+            for (let l = 0; l < a[0].rows.length; l++)
+                for (let i = 0; i < a[0].rows[l].cells.length; i++) {
+                    let s = a[0].rows[l].cells[i].innerHTML,
+                        r = s.indexOf(e);
+                    r >= 0 && ((s = s.substring(0, r) + "<span style='background-color: yellow;'>" + s.substring(r, r + e.length) + "</span>" + s.substring(r + e.length)), (a[0].rows[l].cells[i].innerHTML = s), a[0].rows[l].cells[i].classList.add(`${this.HeaderDataTable[i].replace(/\s/g, "_")}__row`));
+                }
+        }
+    }
+    JSONinit(e = []) {
+        for (let t in ((this.HeaderDataTable = []), e[0])) this.HeaderDataTable.push(t);
+        (this.DataTable = e), (this.DataSearch = e), this.RenderToHTML();
+    }
+    HideCol(e) {
+        let t = document.getElementsByClassName(`${e}__row`);
+        for (let a = 0; a < t.length; a++) t[a].style.display = "none";
+        let l = document.getElementById(`${e}_header`),
+            i = document.getElementById(`${e}_footer`);
+        l && ((l.style.display = "none"), i && (i.style.display = "none"));
+    }
+    ShowCol(e) {
+        let t = document.getElementsByClassName(`${e}__row`);
+        for (let a = 0; a < t.length; a++) t[a].style.display = "";
+        let l = document.getElementById(`${e}_header`),
+            i = document.getElementById(`${e}_footer`);
+        l && ((l.style.display = ""), i && (i.style.display = ""));
+    }
+    DoHide() {
+        let e = this.HeaderDataTable,
+            t = [];
+        for (let a = 0; a < this.HeaderDataTable.length; a++) t.push(!0);
+        for (let l = 0; l < this.ListHiding.length; l++) {
+            let i = e.indexOf(this.ListHiding[l]);
+            i > -1 && (t[i] = !1);
+        }
+        let s = [],
+            r = [];
+        for (let n = 0; n < t.length; n++) t[n] && s.push(n), t[n] || r.push(n);
+        for (let h = 0; h < s.length; h++) this.ShowCol(e[s[h]]);
+        for (let o = 0; o < r.length; o++) this.HideCol(e[r[o]]);
+    }
+}
