@@ -19,7 +19,7 @@ You can enter options in the second parameter
 		ShowSelect:true, // show show select,
 		ShowPaginate:true, // show paginate ,
 		SelectionNumber:[7,10,20,50,-1], //Change Option in Select
-		PageSize: 7,
+		PageSize: 7, //Change page length
 		HideColumn:[], // Hide column
 		ShowHighlight:false, // show Highlight if search
 	        fixedTable:true, // fixed table
