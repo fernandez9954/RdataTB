@@ -18,7 +18,8 @@ You can enter options in the second parameter
 		ShowSearch:true, // show search field,
 		ShowSelect:true, // show show select,
 		ShowPaginate:true, // show paginate ,
-		SelectionNumber:[5,10,20,50], //Change Option in Select
+		SelectionNumber:[7,10,20,50,-1], //Change Option in Select
+		PageSize: 7,
 		HideColumn:[], // Hide column
 		ShowHighlight:false, // show Highlight if search
 	        fixedTable:true, // fixed table
